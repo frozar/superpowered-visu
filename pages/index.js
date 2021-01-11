@@ -174,7 +174,10 @@ const draw = (
       // If zoomGlobal big enough, apply a zoom
       if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
         console.log("PASS 1.0");
-        if (!(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN)) {
+        if (
+          !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
+          !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
+        ) {
           console.log("PASS 1.0.0");
           ctx.translate(x1FixedPx, 0);
           ctx.scale(zoomGlobal, 1);
@@ -219,8 +222,10 @@ const draw = (
         console.log("PASS 2.0");
         console.log("zoom0", zoom0);
         console.log("zoomGlobal", zoomGlobal);
-        console.log("zoomMin", ZOOM_MIN);
-        if (!(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN)) {
+        if (
+          !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
+          !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
+        ) {
           console.log("PASS 2.0.0");
           const xFixedGlobal =
             ((1 - zoom0) * zoom1 * x0FixedPx + (1 - zoom1) * x1FixedPx) /
