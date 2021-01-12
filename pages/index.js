@@ -397,6 +397,8 @@ function SongVisu(props) {
   const [zoom1, setZoom1] = useState(1);
   const [translation, setTranslation] = useState(0);
   const [init, setInit] = useState(true);
+  const [moving, setMoving] = useState(false);
+  const [mouseMoveXOriginPx, setMouseMoveXOriginPx] = useState(0);
 
   const canvasRef = useRef(null);
 
@@ -436,7 +438,7 @@ function SongVisu(props) {
 
   // Executed at initialisation and when props.channel or zoom1 change
   useEffect(() => {
-    if (init || zoom1 !== 1) {
+    if (init || zoom1 !== 1 || moving) {
       const canvas = canvasRef.current;
 
       setDimension(canvas);
@@ -460,12 +462,44 @@ function SongVisu(props) {
       dbg("");
     }
     setInit(false);
-  }, [props.channel, zoom1]);
+  }, [props.channel, zoom1, translation]);
+
+  const handleOnMouseDown = (event, canvasRef) => {
+    const canvas = canvasRef.current;
+    if (event.ctrlKey) {
+      canvas.style.cursor = "move";
+      // console.log("event", event);
+      setMoving(true);
+      setMouseMoveXOriginPx(event.nativeEvent.offsetX);
+    }
+  };
+
+  const handleOnMouseMove = (event, canvasRef) => {
+    if (moving) {
+      const mouseXPx = event.nativeEvent.offsetX;
+      const moveVectPx = mouseXPx - mouseMoveXOriginPx;
+      // console.log("mouseXPx", mouseXPx);
+      // console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
+      // console.log("moveVectPx", moveVectPx);
+      // TODO: don't set directly the translation property
+      setTranslation(translation + moveVectPx / zoom0);
+    }
+  };
+
+  const handleOnMouseUp = (event, canvasRef) => {
+    const canvas = canvasRef.current;
+    canvas.style.cursor = "default";
+    setMoving(false);
+    setMouseMoveXOriginPx(0);
+  };
 
   return (
     <canvas
       ref={canvasRef}
       style={{ boxShadow: "2px 6px 10px 2px rgba(0,0,0,0.3)" }}
+      onMouseDown={(event) => handleOnMouseDown(event, canvasRef)}
+      onMouseMove={(event) => handleOnMouseMove(event, canvasRef)}
+      onMouseUp={(event) => handleOnMouseUp(event, canvasRef)}
       {...props}
     />
   );
