@@ -97,39 +97,75 @@ function Credit(props) {
   }
 }
 
-const drawCorners = (ctx, height) => {
-  const radius = 10;
-  const heightOffset = height / 2;
+function componentToHex(c) {
+  var hex = c.toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function drawBackground(ctx) {
+  const halfHeight = ctx.canvas.height / 2;
+  const brightPt = (-halfHeight * 2) / 3;
+
+  let centerColorValue;
+  let borderColorValue;
+  // Compute the upper background cosine gradiant
+  const nbStep = 20;
+  centerColorValue = 255;
+  borderColorValue = 210;
+  const grd0 = ctx.createLinearGradient(0, brightPt, 0, -halfHeight);
+  for (let i = 0; i < nbStep; ++i) {
+    const weight = Math.cos(((i / (nbStep - 1)) * Math.PI) / 2);
+    const interpValue = Math.floor(
+      weight * centerColorValue + (1 - weight) * borderColorValue
+    );
+    const color = rgbToHex(interpValue, interpValue, interpValue);
+    grd0.addColorStop(i / (nbStep - 1), color);
+  }
+
+  ctx.fillStyle = grd0;
 
   ctx.beginPath();
-  const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
-  grd.addColorStop(0, "red");
-  grd.addColorStop(1, "blue");
-  ctx.fillStyle = grd;
-
-  ctx.moveTo(0, -heightOffset);
-  ctx.arc(0, -heightOffset, radius, 0, 2 * Math.PI);
-  ctx.arc(ctx.canvas.width, -heightOffset, radius, 0, 2 * Math.PI);
-  ctx.moveTo(0, ctx.canvas.height - heightOffset);
-  ctx.arc(0, ctx.canvas.height - heightOffset, radius, 0, 2 * Math.PI);
-  ctx.arc(
-    ctx.canvas.width,
-    ctx.canvas.height - heightOffset,
-    radius,
-    0,
-    2 * Math.PI
-  );
+  const rectHeight0 = ctx.canvas.height - (halfHeight - brightPt);
+  ctx.fillRect(0, brightPt, ctx.canvas.width, -rectHeight0);
   ctx.fill();
-};
+
+  centerColorValue = 255;
+  borderColorValue = 160;
+  const grd1 = ctx.createLinearGradient(0, brightPt, 0, halfHeight);
+  for (let i = 0; i < nbStep; ++i) {
+    const weight = Math.cos(((i / (nbStep - 1)) * Math.PI) / 2);
+    const interpValue = Math.floor(
+      weight * centerColorValue + (1 - weight) * borderColorValue
+    );
+    const color = rgbToHex(interpValue, interpValue, interpValue);
+    grd1.addColorStop(i / (nbStep - 1), color);
+  }
+  ctx.fillStyle = grd1;
+
+  ctx.beginPath();
+  const rectHeight1 = ctx.canvas.height - (brightPt - -halfHeight);
+  ctx.fillRect(0, brightPt, ctx.canvas.width, rectHeight1);
+  ctx.fill();
+}
 
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
 }
 
-const draw = (
+let verbose = false;
+
+function dbg() {
+  if (verbose) {
+    console.log(...arguments);
+  }
+}
+
+function applyZoom(
   ctx,
-  height,
-  channel,
   x0FixedPx,
   setX0FixedPx,
   zoom0,
@@ -139,21 +175,13 @@ const draw = (
   setZoom1,
   translation,
   setTranslation
-) => {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  drawCorners(ctx, height);
-
-  // Apply zoom
-  // console.log("zoomXFocalPx", zoomXFocalPx);
-  // console.log("zoomFactor", zoomFactor);
-  // ctx.translate(zoomXFocalGraph, 0);
-  // ctx.scale(zoomFactor, 1);
-  // ctx.translate(-zoomXFocalGraph, 0);
-  console.log("x0FixedPx", x0FixedPx);
-  console.log("x1FixedPx", x1FixedPx);
-  console.log("zoom0", zoom0);
-  console.log("zoom1", zoom1);
-  console.log("translation", translation);
+) {
+  verbose = false;
+  dbg("x0FixedPx", x0FixedPx);
+  dbg("x1FixedPx", x1FixedPx);
+  dbg("zoom0", zoom0);
+  dbg("zoom1", zoom1);
+  dbg("translation", translation);
 
   const ZOOM_MAX = 200;
   const ZOOM_MIN = 0.5;
@@ -163,17 +191,17 @@ const draw = (
   }
 
   if (x0FixedPx === x1FixedPx) {
-    console.log("PASS 1");
+    dbg("PASS 1");
     const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
-    console.log("zoomGlobal", zoomGlobal);
+    dbg("zoomGlobal", zoomGlobal);
     // If zoomGlobal big enough, apply a zoom
     if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
-      console.log("PASS 1.0");
+      dbg("PASS 1.0");
       if (
         !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
         !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
       ) {
-        console.log("PASS 1.0.0");
+        dbg("PASS 1.0.0");
         // Avoid the see on the left part of the track
         if (0 < transformOf0(x0FixedPx, zoomGlobal, translation)) {
           ctx.scale(zoomGlobal, 1);
@@ -188,7 +216,7 @@ const draw = (
           setZoom0(zoomGlobal);
         }
       } else {
-        console.log("PASS 1.0.1");
+        dbg("PASS 1.0.1");
         // In this case, zoom0 === ZOOM_MIN or zoom0 === ZOOM_MAX.
         // So the visu seems unchanged: don't update intern parameters
         ctx.translate(x0FixedPx, 0);
@@ -197,12 +225,12 @@ const draw = (
         ctx.translate(translation, 0);
       }
     } else {
-      console.log("PASS 1.1");
+      dbg("PASS 1.1");
 
       // zoomGlobal near to 1
       // In the x0 == x1, don't update the translation vector
 
-      console.log("transformOf0", transformOf0(0, 1, translation));
+      dbg("transformOf0", transformOf0(0, 1, translation));
 
       // Avoid the see on the left part of the track
       if (0 < transformOf0(0, 1, translation)) {
@@ -217,25 +245,25 @@ const draw = (
     }
     setZoom1(1);
   } else {
-    console.log("PASS 2");
+    dbg("PASS 2");
     const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
-    console.log("zoomGlobal", zoomGlobal);
+    dbg("zoomGlobal", zoomGlobal);
     // If zoomGlobal big enough, apply a zoom
     if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
-      console.log("PASS 2.0");
-      console.log("zoom0", zoom0);
-      console.log("zoomGlobal", zoomGlobal);
+      dbg("PASS 2.0");
+      dbg("zoom0", zoom0);
+      dbg("zoomGlobal", zoomGlobal);
       if (
         !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
         !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
       ) {
-        console.log("PASS 2.0.0");
+        dbg("PASS 2.0.0");
         const xFixedGlobal =
           ((1 - zoom0) * zoom1 * x0FixedPx + (1 - zoom1) * x1FixedPx) /
           (1 - zoom0 * zoom1);
 
-        console.log("xFixedGlobal", xFixedGlobal);
-        console.log(
+        dbg("xFixedGlobal", xFixedGlobal);
+        dbg(
           "transformOf0",
           transformOf0(xFixedGlobal, zoomGlobal, translation)
         );
@@ -254,7 +282,7 @@ const draw = (
           setZoom0(zoomGlobal);
         }
       } else {
-        console.log("PASS 2.0.1");
+        dbg("PASS 2.0.1");
         // In this case, zoom0 === ZOOM_MIN or zoom0 === ZOOM_MAX.
         // So the visu seems unchanged: don't update intern parameters
 
@@ -270,16 +298,12 @@ const draw = (
         }
       }
     } else {
-      console.log("PASS 2.1");
+      dbg("PASS 2.1");
 
       // zoomGlobal near to 1
       const translationInc =
         (1 / zoom0 - 1) * x0FixedPx + (1 - 1 / zoom0) * x1FixedPx;
 
-      // console.log(
-      //   "transformOf0",
-      //   transformOf0(0, 1, translation + translationInc)
-      // );
       // Avoid the see on the left part of the track
       if (0 < transformOf0(0, 1, translation + translationInc)) {
         setTranslation(0);
@@ -294,16 +318,40 @@ const draw = (
     }
     setZoom1(1);
   }
+}
 
-  // Draw rectangles
-  ctx.scale(1, height / 2);
+const draw = (
+  ctx,
+  channel,
+  x0FixedPx,
+  setX0FixedPx,
+  zoom0,
+  setZoom0,
+  x1FixedPx,
+  zoom1,
+  setZoom1,
+  translation,
+  setTranslation
+) => {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  drawBackground(ctx);
 
-  // Create gradient
-  const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
-  grd.addColorStop(0, "red");
-  grd.addColorStop(1, "blue");
-  ctx.strokeStyle = grd;
+  // Apply zoom
+  applyZoom(
+    ctx,
+    x0FixedPx,
+    setX0FixedPx,
+    zoom0,
+    setZoom0,
+    x1FixedPx,
+    zoom1,
+    setZoom1,
+    translation,
+    setTranslation
+  );
 
+  // Draw line
+  ctx.scale(1, ctx.canvas.height / 2);
   const pointWidth = ctx.canvas.width / channel.data.length;
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -315,6 +363,10 @@ const draw = (
   }
 
   // Apply gradient
+  const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
+  grd.addColorStop(0, "red");
+  grd.addColorStop(1, "blue");
+  ctx.strokeStyle = grd;
   ctx.lineWidth = 0.005;
   ctx.stroke();
 };
@@ -330,13 +382,11 @@ const handleWheel = (event, setX1FixedPx, setZoom1) => {
     const multiplyFactor = 1 + adjust;
     const zoom1 = multiplyFactor;
     setZoom1(zoom1);
-    // console.log("zoom1", zoom1);
   } else if (event.deltaY > 0) {
     const adjust = event.deltaY / adjustNormalisation;
     const multiplyFactor = 1 + adjust;
     const zoom1 = 1 / multiplyFactor;
     setZoom1(zoom1);
-    // console.log("zoom1", zoom1);
   }
 };
 
@@ -346,22 +396,20 @@ function SongVisu(props) {
   const [x1FixedPx, setX1FixedPx] = useState(0);
   const [zoom1, setZoom1] = useState(1);
   const [translation, setTranslation] = useState(0);
+  const [init, setInit] = useState(true);
 
   const canvasRef = useRef(null);
 
   // Executed only once
   useEffect(() => {
-    const canvas = canvasRef.current;
-    // console.log(canvas.width);
-
     const wheelEventListener = (event) => {
       handleWheel(event, setX1FixedPx, setZoom1);
-      // console.log("1 newGraphXOriginPx", graphXOriginPx);
     };
 
     // Treat wheel event with native event, not synthetic event.
     // Documentation link:
     // https://medium.com/@ericclemmons/react-event-preventdefault-78c28c950e46
+    const canvas = canvasRef.current;
     canvas.addEventListener("wheel", wheelEventListener);
 
     return () => {
@@ -369,60 +417,35 @@ function SongVisu(props) {
     };
   }, []);
 
-  // Executed only once
+  function setDimension(canvas) {
+    const parentNode = canvas.parentNode;
+    const width = parentNode.clientWidth;
+    const height = parentNode.clientHeight;
+    const style = getComputedStyle(parentNode);
+
+    // Docutation link:
+    // https://www.javascripttutorial.net/javascript-dom/javascript-width-height/
+    const contentWidth =
+      width - parseInt(style.paddingLeft) - parseInt(style.paddingRight);
+    const contentHeight =
+      height - parseInt(style.paddingTop) - parseInt(style.paddingBottom);
+
+    canvas.width = contentWidth;
+    canvas.height = contentHeight;
+  }
+
+  // Executed at initialisation and when props.channel or zoom1 change
   useEffect(() => {
-    const canvas = canvasRef.current;
-
-    const ctx = canvas.getContext("2d");
-    const vw = Math.max(
-      document.documentElement.clientWidth || 0,
-      window.innerWidth || 0
-    );
-
-    canvas.width = vw;
-    const height = 200;
-    canvas.height = height;
-
-    ctx.translate(0, height / 2);
-
-    //Our draw come here
-    draw(
-      ctx,
-      height,
-      props.channel,
-      x0FixedPx,
-      setX0FixedPx,
-      zoom0,
-      setZoom0,
-      x1FixedPx,
-      zoom1,
-      setZoom1,
-      translation,
-      setTranslation
-    );
-  }, []);
-
-  // Executed only when props.channel or zoom1 change
-  useEffect(() => {
-    if (zoom1 !== 1) {
+    if (init || zoom1 !== 1) {
       const canvas = canvasRef.current;
 
+      setDimension(canvas);
       const ctx = canvas.getContext("2d");
-      const vw = Math.max(
-        document.documentElement.clientWidth || 0,
-        window.innerWidth || 0
-      );
-
-      canvas.width = vw;
-      const height = 200;
-      canvas.height = height;
-
-      ctx.translate(0, height / 2);
+      ctx.translate(0, canvas.height / 2);
 
       //Our draw come here
       draw(
         ctx,
-        height,
         props.channel,
         x0FixedPx,
         setX0FixedPx,
@@ -434,11 +457,18 @@ function SongVisu(props) {
         translation,
         setTranslation
       );
-      console.log("");
+      dbg("");
     }
+    setInit(false);
   }, [props.channel, zoom1]);
 
-  return <canvas ref={canvasRef} {...props} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ boxShadow: "2px 6px 10px 2px rgba(0,0,0,0.3)" }}
+      {...props}
+    />
+  );
 }
 
 class Stretcher extends React.Component {
@@ -589,6 +619,11 @@ class Stretcher extends React.Component {
     } else if (step === this.DECODING) {
       return <div>Decoding audio...</div>;
     } else if (step >= this.READY) {
+      const divWidthPx = Math.max(
+        document.documentElement.clientWidth || 0,
+        window.innerWidth || 0
+      );
+      const divHeightPx = 250;
       return (
         <>
           <div>
@@ -596,7 +631,16 @@ class Stretcher extends React.Component {
             <RateSlider audioNode={this.audioNode} />
             <Credit fileName={this.state.fileName} />
           </div>
-          <div onScroll={() => console.log("scroll div")}>
+          <div
+            style={{
+              width: `calc(${divWidthPx}px - 1em)`,
+              height: `calc(${divHeightPx}px + 2em)`,
+              paddingTop: "1em",
+              paddingBottom: "1em",
+              paddingLeft: "0.5em",
+              paddingRight: "0.5em",
+            }}
+          >
             <SongVisu channel={this.state.visuDataLeft} />
           </div>
         </>
@@ -614,9 +658,6 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
         <Stretcher />
       </main>
     </div>
