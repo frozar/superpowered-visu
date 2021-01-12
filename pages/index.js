@@ -101,7 +101,12 @@ const drawCorners = (ctx, height) => {
   const radius = 10;
   const heightOffset = height / 2;
 
-  ctx.fillStyle = "#000000";
+  ctx.beginPath();
+  const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
+  grd.addColorStop(0, "red");
+  grd.addColorStop(1, "blue");
+  ctx.fillStyle = grd;
+
   ctx.moveTo(0, -heightOffset);
   ctx.arc(0, -heightOffset, radius, 0, 2 * Math.PI);
   ctx.arc(ctx.canvas.width, -heightOffset, radius, 0, 2 * Math.PI);
@@ -136,7 +141,6 @@ const draw = (
   setTranslation
 ) => {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.beginPath();
   drawCorners(ctx, height);
 
   // Apply zoom
@@ -151,170 +155,185 @@ const draw = (
   console.log("zoom1", zoom1);
   console.log("translation", translation);
 
-  const ZOOM_MAX = 100;
+  const ZOOM_MAX = 200;
   const ZOOM_MIN = 0.5;
   const eps = 1e-6;
-  if (zoom1 === undefined) {
-    // First visu: do nothing
-  } else {
-    if (x0FixedPx === undefined) {
-      console.log("PASS 0");
-      const zoomToApply = clamp(zoom1, ZOOM_MIN, ZOOM_MAX);
-      ctx.translate(x1FixedPx, 0);
-      ctx.scale(zoomToApply, 1);
-      ctx.translate(-x1FixedPx, 0);
-      ctx.translate(translation, 0);
-      setX0FixedPx(x1FixedPx);
-      setZoom0(zoomToApply);
-      setZoom1(1);
-    } else if (x0FixedPx === x1FixedPx) {
-      console.log("PASS 1");
-      const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
-      console.log("zoomGlobal", zoomGlobal);
-      // If zoomGlobal big enough, apply a zoom
-      if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
-        console.log("PASS 1.0");
-        if (
-          !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
-          !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
-        ) {
-          console.log("PASS 1.0.0");
-          ctx.translate(x1FixedPx, 0);
+  function transformOf0(xFixedPx, zoom, translation) {
+    return (0 - xFixedPx) * zoom + xFixedPx + translation;
+  }
+
+  if (x0FixedPx === x1FixedPx) {
+    console.log("PASS 1");
+    const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
+    console.log("zoomGlobal", zoomGlobal);
+    // If zoomGlobal big enough, apply a zoom
+    if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
+      console.log("PASS 1.0");
+      if (
+        !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
+        !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
+      ) {
+        console.log("PASS 1.0.0");
+        // Avoid the see on the left part of the track
+        if (0 < transformOf0(x0FixedPx, zoomGlobal, translation)) {
           ctx.scale(zoomGlobal, 1);
-          ctx.translate(-x1FixedPx, 0);
-          ctx.translate(translation, 0);
+          setX0FixedPx(0);
           setZoom0(zoomGlobal);
+          setTranslation(0);
         } else {
-          console.log("PASS 1.0.1");
-          // In this case, the visu seems unchanged: don't update intern parameters
           ctx.translate(x0FixedPx, 0);
-          ctx.scale(zoom0, 1);
+          ctx.scale(zoomGlobal, 1);
           ctx.translate(-x0FixedPx, 0);
           ctx.translate(translation, 0);
+          setZoom0(zoomGlobal);
         }
       } else {
-        // TODO: Do a translation and keep this information
-        console.log("PASS 1.1");
-        // console.log("Deal WITH IT: Do a translation and keep this information");
-        const translationInc =
-          (1 / zoom0 - 1) * x0FixedPx + (1 - 1 / zoom0) * x1FixedPx;
-        console.log("x0FixedPx", x0FixedPx);
-        console.log("x1FixedPx", x1FixedPx);
-        console.log("(1 / zoom0 - 1)", 1 / zoom0 - 1);
-        console.log("(1 - 1 / zoom0)", 1 - 1 / zoom0);
-        console.log("f0", (1 / zoom0 - 1) * x0FixedPx);
-        console.log("f1", (1 - 1 / zoom0) * x1FixedPx);
-        console.log("translationInc", translationInc);
-        console.log("translationGlobal", translation + translationInc);
-        ctx.translate(translationInc, 0);
+        console.log("PASS 1.0.1");
+        // In this case, zoom0 === ZOOM_MIN or zoom0 === ZOOM_MAX.
+        // So the visu seems unchanged: don't update intern parameters
+        ctx.translate(x0FixedPx, 0);
+        ctx.scale(zoom0, 1);
+        ctx.translate(-x0FixedPx, 0);
         ctx.translate(translation, 0);
-        setTranslation(translation + translationInc);
-        setX0FixedPx(undefined);
+      }
+    } else {
+      console.log("PASS 1.1");
+
+      // zoomGlobal near to 1
+      // In the x0 == x1, don't update the translation vector
+
+      console.log("transformOf0", transformOf0(0, 1, translation));
+
+      // Avoid the see on the left part of the track
+      if (0 < transformOf0(0, 1, translation)) {
+        setTranslation(0);
+        setX0FixedPx(0);
+        setZoom0(1);
+      } else {
+        ctx.translate(translation, 0);
+        setX0FixedPx(0);
         setZoom0(1);
       }
-      setZoom1(1);
-    } else {
-      console.log("PASS 2");
-      const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
+    }
+    setZoom1(1);
+  } else {
+    console.log("PASS 2");
+    const zoomGlobal = clamp(zoom0 * zoom1, ZOOM_MIN, ZOOM_MAX);
+    console.log("zoomGlobal", zoomGlobal);
+    // If zoomGlobal big enough, apply a zoom
+    if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
+      console.log("PASS 2.0");
+      console.log("zoom0", zoom0);
       console.log("zoomGlobal", zoomGlobal);
-      // If zoomGlobal big enough, apply a zoom
-      if (zoomGlobal < 1 - eps || 1 + eps < zoomGlobal) {
-        console.log("PASS 2.0");
-        console.log("zoom0", zoom0);
-        console.log("zoomGlobal", zoomGlobal);
-        if (
-          !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
-          !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
-        ) {
-          console.log("PASS 2.0.0");
-          const xFixedGlobal =
-            ((1 - zoom0) * zoom1 * x0FixedPx + (1 - zoom1) * x1FixedPx) /
-            (1 - zoom0 * zoom1);
+      if (
+        !(zoom0 === ZOOM_MIN && zoomGlobal === ZOOM_MIN) &&
+        !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
+      ) {
+        console.log("PASS 2.0.0");
+        const xFixedGlobal =
+          ((1 - zoom0) * zoom1 * x0FixedPx + (1 - zoom1) * x1FixedPx) /
+          (1 - zoom0 * zoom1);
 
-          console.log("xFixedGlobal", xFixedGlobal);
-
+        console.log("xFixedGlobal", xFixedGlobal);
+        console.log(
+          "transformOf0",
+          transformOf0(xFixedGlobal, zoomGlobal, translation)
+        );
+        // Avoid the see on the left part of the track
+        if (0 < transformOf0(xFixedGlobal, zoomGlobal, translation)) {
+          ctx.scale(zoomGlobal, 1);
+          setX0FixedPx(0);
+          setZoom0(zoomGlobal);
+          setTranslation(0);
+        } else {
           ctx.translate(xFixedGlobal, 0);
           ctx.scale(zoomGlobal, 1);
           ctx.translate(-xFixedGlobal, 0);
           ctx.translate(translation, 0);
           setX0FixedPx(xFixedGlobal);
           setZoom0(zoomGlobal);
+        }
+      } else {
+        console.log("PASS 2.0.1");
+        // In this case, zoom0 === ZOOM_MIN or zoom0 === ZOOM_MAX.
+        // So the visu seems unchanged: don't update intern parameters
+
+        // Avoid the see on the left part of the track
+        if (0 < transformOf0(x0FixedPx, zoom0, translation)) {
+          ctx.scale(zoom0, 1);
+          setTranslation(0);
         } else {
-          console.log("PASS 2.0.1");
-          // In this case, the visu seems unchanged: don't update intern parameters
           ctx.translate(x0FixedPx, 0);
           ctx.scale(zoom0, 1);
           ctx.translate(-x0FixedPx, 0);
           ctx.translate(translation, 0);
         }
+      }
+    } else {
+      console.log("PASS 2.1");
+
+      // zoomGlobal near to 1
+      const translationInc =
+        (1 / zoom0 - 1) * x0FixedPx + (1 - 1 / zoom0) * x1FixedPx;
+
+      // console.log(
+      //   "transformOf0",
+      //   transformOf0(0, 1, translation + translationInc)
+      // );
+      // Avoid the see on the left part of the track
+      if (0 < transformOf0(0, 1, translation + translationInc)) {
+        setTranslation(0);
+        setX0FixedPx(0);
+        setZoom0(1);
       } else {
-        // TODO: Do a translation and keep this information
-        console.log("PASS 2.1");
-        // console.log("Deal WITH IT: Do a translation and keep this information");
-        const translationInc =
-          (1 / zoom0 - 1) * x0FixedPx + (1 - 1 / zoom0) * x1FixedPx;
-        // console.log("x0FixedPx", x0FixedPx);
-        // console.log("x1FixedPx", x1FixedPx);
-        // console.log("(1 / zoom0 - 1)", 1 / zoom0 - 1);
-        // console.log("(1 - 1 / zoom0)", 1 - 1 / zoom0);
-        // console.log("f0", (1 / zoom0 - 1) * x0FixedPx);
-        // console.log("f1", (1 - 1 / zoom0) * x1FixedPx);
-        // console.log("translationInc", translationInc);
-        ctx.translate(translationInc, 0);
-        ctx.translate(translation, 0);
+        ctx.translate(translation + translationInc, 0);
         setTranslation(translation + translationInc);
-        setX0FixedPx(undefined);
+        setX0FixedPx(0);
         setZoom0(1);
       }
-      setZoom1(1);
     }
+    setZoom1(1);
   }
 
   // Draw rectangles
   ctx.scale(1, height / 2);
 
   // Create gradient
-  let grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
+  const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
   grd.addColorStop(0, "red");
   grd.addColorStop(1, "blue");
-  ctx.fillStyle = grd;
+  ctx.strokeStyle = grd;
 
-  const rectangleWidth = ctx.canvas.width / channel.data.length;
+  const pointWidth = ctx.canvas.width / channel.data.length;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
   for (let i = 0; i < channel.data.length; ++i) {
-    ctx.fillRect(
-      i * rectangleWidth,
-      0,
-      rectangleWidth * 0.95,
+    ctx.lineTo(
+      (i * pointWidth + (i * pointWidth + pointWidth * 0.95)) / 2,
       -channel.data[i]
     );
   }
 
   // Apply gradient
-  ctx.fill();
+  ctx.lineWidth = 0.005;
+  ctx.stroke();
 };
 
 const handleWheel = (event, setX1FixedPx, setZoom1) => {
   event.preventDefault();
-  // let newZoomFactor = 1;
   const adjustNormalisation = 200;
-  // const zoomMax = 100;
-  // const zoomMin = 1;
-
   const mouseXPx = event.offsetX;
   setX1FixedPx(mouseXPx);
-  // console.log("mouseXPx", mouseXPx);
 
   if (event.deltaY < 0) {
     const adjust = -event.deltaY / adjustNormalisation;
     const multiplyFactor = 1 + adjust;
-    // newZoomFactor = Math.min(zoomFactor * multiplyFactor, zoomMax);
     const zoom1 = multiplyFactor;
     setZoom1(zoom1);
     // console.log("zoom1", zoom1);
   } else if (event.deltaY > 0) {
     const adjust = event.deltaY / adjustNormalisation;
     const multiplyFactor = 1 + adjust;
-    // newZoomFactor = Math.max(zoomFactor / multiplyFactor, zoomMin);
     const zoom1 = 1 / multiplyFactor;
     setZoom1(zoom1);
     // console.log("zoom1", zoom1);
@@ -322,18 +341,15 @@ const handleWheel = (event, setX1FixedPx, setZoom1) => {
 };
 
 function SongVisu(props) {
-  // const [previousZoomFactor, setPreviousZoomFactor] = useState(1);
-  // const [zoomFactor, setZoomFactor] = useState(1);
-  // const [zoomXFocalGraph, setZoomXFocalGraph] = useState(0);
-  // const [graphXOriginPx, setGraphXOriginPx] = useState(0);
-  const [x0FixedPx, setX0FixedPx] = useState(undefined);
+  const [x0FixedPx, setX0FixedPx] = useState(0);
   const [zoom0, setZoom0] = useState(1);
-  const [x1FixedPx, setX1FixedPx] = useState(undefined);
-  const [zoom1, setZoom1] = useState(undefined);
+  const [x1FixedPx, setX1FixedPx] = useState(0);
+  const [zoom1, setZoom1] = useState(1);
   const [translation, setTranslation] = useState(0);
 
   const canvasRef = useRef(null);
 
+  // Executed only once
   useEffect(() => {
     const canvas = canvasRef.current;
     // console.log(canvas.width);
@@ -351,8 +367,42 @@ function SongVisu(props) {
     return () => {
       canvas.removeEventListener("wheel", wheelEventListener);
     };
-  }, []); // [zoomFactor, graphXOriginPx]);
+  }, []);
 
+  // Executed only once
+  useEffect(() => {
+    const canvas = canvasRef.current;
+
+    const ctx = canvas.getContext("2d");
+    const vw = Math.max(
+      document.documentElement.clientWidth || 0,
+      window.innerWidth || 0
+    );
+
+    canvas.width = vw;
+    const height = 200;
+    canvas.height = height;
+
+    ctx.translate(0, height / 2);
+
+    //Our draw come here
+    draw(
+      ctx,
+      height,
+      props.channel,
+      x0FixedPx,
+      setX0FixedPx,
+      zoom0,
+      setZoom0,
+      x1FixedPx,
+      zoom1,
+      setZoom1,
+      translation,
+      setTranslation
+    );
+  }, []);
+
+  // Executed only when props.channel or zoom1 change
   useEffect(() => {
     if (zoom1 !== 1) {
       const canvas = canvasRef.current;
@@ -447,9 +497,11 @@ class Stretcher extends React.Component {
       maxValue = Math.max(maxValue, avg < 0 ? -avg : avg);
     }
 
-    // Normalise data
+    // Normalise data.
+    // As values are in [0, 1], use the cubic root to give volume
+    // in the visualisation
     for (let i = 0; i < nbComputation; ++i) {
-      avgs[i] /= maxValue;
+      avgs[i] = Math.cbrt(avgs[i] / maxValue);
     }
     return { data: avgs, sampleRate: ptPerSec };
   }
@@ -462,7 +514,7 @@ class Stretcher extends React.Component {
       // console.log("pcmData", pcmData);
       const channelLeft = pcmData.getChannelData(0);
       const channelRight = pcmData.getChannelData(1);
-      const ptPerSec = 1500;
+      const ptPerSec = 300;
       const visuDataLeft = this.filterChannel(
         channelLeft,
         pcmData.sampleRate,
@@ -474,8 +526,6 @@ class Stretcher extends React.Component {
         ptPerSec
       );
       this.setState({ visuDataLeft, visuDataRight });
-      // console.log("visuDataLeft", visuDataLeft);
-      // console.log("visuDataRight", visuDataRight);
 
       // Safari doesn't support await for decodeAudioData yet
       // send the PCM audio to the audio node
@@ -549,7 +599,6 @@ class Stretcher extends React.Component {
           <div onScroll={() => console.log("scroll div")}>
             <SongVisu channel={this.state.visuDataLeft} />
           </div>
-          {/* <div style={{ height: "1000px" }} /> */}
         </>
       );
     }
@@ -568,54 +617,8 @@ export default function Home() {
         <h1 className={styles.title}>
           Welcome to <a href="https://nextjs.org">Next.js!</a>
         </h1>
-        {/* 
-        <p className={styles.description}>
-          Get started by editing{" "}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div> */}
         <Stretcher />
       </main>
-
-      {/* <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{" "}
-          <img src="/vercel.svg" alt="Vercel Logo" className={styles.logo} />
-        </a>
-      </footer> */}
     </div>
   );
 }
