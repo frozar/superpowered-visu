@@ -164,6 +164,10 @@ function dbg() {
   }
 }
 
+function transformOf0(xFixedPx, zoom, translationPx) {
+  return (0 - xFixedPx) * zoom + xFixedPx + translationPx * zoom;
+}
+
 function applyZoom(
   ctx,
   x0FixedPx,
@@ -176,7 +180,7 @@ function applyZoom(
   translation,
   setTranslation
 ) {
-  verbose = false;
+  verbose = true;
   dbg("x0FixedPx", x0FixedPx);
   dbg("x1FixedPx", x1FixedPx);
   dbg("zoom0", zoom0);
@@ -186,9 +190,6 @@ function applyZoom(
   const ZOOM_MAX = 200;
   const ZOOM_MIN = 0.5;
   const eps = 1e-6;
-  function transformOf0(xFixedPx, zoom, translation) {
-    return (0 - xFixedPx) * zoom + xFixedPx + translation;
-  }
 
   if (x0FixedPx === x1FixedPx) {
     dbg("PASS 1");
@@ -202,6 +203,7 @@ function applyZoom(
         !(zoom0 === ZOOM_MAX && zoomGlobal === ZOOM_MAX)
       ) {
         dbg("PASS 1.0.0");
+        dbg("transform", transformOf0(x0FixedPx, zoomGlobal, translation));
         // Avoid the see on the left part of the track
         if (0 < transformOf0(x0FixedPx, zoomGlobal, translation)) {
           ctx.scale(zoomGlobal, 1);
@@ -227,18 +229,19 @@ function applyZoom(
     } else {
       dbg("PASS 1.1");
 
-      // zoomGlobal near to 1
-      // In the x0 == x1, don't update the translation vector
+      // zoomGlobal == 1 ; x0 == x1
 
       dbg("transformOf0", transformOf0(0, 1, translation));
 
       // Avoid the see on the left part of the track
       if (0 < transformOf0(0, 1, translation)) {
+        dbg("PASS 1.1.0");
         setTranslation(0);
         setX0FixedPx(0);
         setZoom0(1);
       } else {
         ctx.translate(translation, 0);
+        dbg("PASS 1.1.1");
         setX0FixedPx(0);
         setZoom0(1);
       }
@@ -373,7 +376,7 @@ const draw = (
 
 const handleWheel = (event, setX1FixedPx, setZoom1) => {
   event.preventDefault();
-  const adjustNormalisation = 200;
+  const adjustNormalisation = 20; // TODO: 200
   const mouseXPx = event.offsetX;
   setX1FixedPx(mouseXPx);
 
@@ -399,6 +402,7 @@ function SongVisu(props) {
   const [init, setInit] = useState(true);
   const [moving, setMoving] = useState(false);
   const [mouseMoveXOriginPx, setMouseMoveXOriginPx] = useState(0);
+  const [translationInc, setTranslationInc] = useState(0);
 
   const canvasRef = useRef(null);
 
@@ -474,23 +478,70 @@ function SongVisu(props) {
     }
   };
 
+  // TODO: check if the move is in the X direction
   const handleOnMouseMove = (event, canvasRef) => {
     if (moving) {
+      console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
       const mouseXPx = event.nativeEvent.offsetX;
       const moveVectPx = mouseXPx - mouseMoveXOriginPx;
+      setTranslationInc(moveVectPx / zoom0);
       // console.log("mouseXPx", mouseXPx);
       // console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
       // console.log("moveVectPx", moveVectPx);
-      // TODO: don't set directly the translation property
-      setTranslation(translation + moveVectPx / zoom0);
+      const canvas = canvasRef.current;
+
+      setDimension(canvas);
+      const ctx = canvas.getContext("2d");
+      ctx.translate(0, canvas.height / 2);
+
+      // ctx.translate(x0FixedPx, 0);
+      // ctx.scale(zoom0, 1);
+      // ctx.translate(-x0FixedPx, 0);
+      // ctx.translate(translation + translationInc, 0);
+
+      // console.log("translation", translation);
+      // console.log("translationInc", translationInc);
+      // console.log("translation + translationInc", translation + translationInc);
+      draw(
+        ctx,
+        props.channel,
+        x0FixedPx,
+        setX0FixedPx,
+        zoom0,
+        setZoom0,
+        x1FixedPx,
+        zoom1,
+        setZoom1,
+        // translation + moveVectPx / zoom0,
+        translation + translationInc,
+        (arg) => {}
+        // setTranslationInc
+      );
+      // setMouseMoveXOriginPx(mouseMoveXOriginPx + translationInc);
     }
   };
 
   const handleOnMouseUp = (event, canvasRef) => {
     const canvas = canvasRef.current;
+    if (moving) {
+      // TODO: extract the logic from draw function to know which
+      // transform is relevant to apply and when to update the translation
+      // vector.
+      if (0 < transformOf0(0, 1, translation + translationInc)) {
+        console.log("DON'T UPDATE TRANSLATION VECTOR");
+        console.log("translation", translation);
+        // setTranslation(translation + translationInc);
+      } else {
+        console.log("UPDATE TRANSLATION VECTOR");
+        console.log("translation", translation + translationInc);
+        setTranslation(translation + translationInc);
+      }
+    }
+    setTranslationInc(0);
     canvas.style.cursor = "default";
     setMoving(false);
     setMouseMoveXOriginPx(0);
+    console.log("");
   };
 
   return (
