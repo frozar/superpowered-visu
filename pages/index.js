@@ -3,6 +3,9 @@ import React, { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
+let mouseMoveXOriginPx = 0;
+let translationGphInc = 0;
+
 class PlayButton extends React.Component {
   state = { value: 0 };
 
@@ -184,7 +187,7 @@ function applyZoom(
   translation,
   setTranslation
 ) {
-  verbose = true;
+  verbose = false;
   dbg("x0FixedPx", x0FixedPx);
   dbg("x1FixedPx", x1FixedPx);
   dbg("zoom0", zoom0);
@@ -326,9 +329,6 @@ function applyZoom(
   }
 }
 
-let mouseMoveXOriginPx = 0;
-let translationGphInc = 0;
-
 function applyPan(ctx, x0FixedPx, zoom0, translationGph) {
   const translationMaxGph = translationMaxGphOf0(x0FixedPx, zoom0);
 
@@ -376,7 +376,7 @@ const draw = (ctx, channel) => {
 
 const handleWheel = (event, setX1FixedPx, setZoom1) => {
   event.preventDefault();
-  const adjustNormalisation = 20; // TODO: 200
+  const adjustNormalisation = 200;
   const mouseXPx = event.offsetX;
   setX1FixedPx(mouseXPx);
 
@@ -440,7 +440,7 @@ function SongVisu(props) {
 
   // Executed at initialisation and when props.channel or zoom1 change
   useEffect(() => {
-    if (init || zoom1 !== 1 || moving) {
+    if (init || zoom1 !== 1) {
       const canvas = canvasRef.current;
 
       setDimension(canvas);
@@ -480,13 +480,14 @@ function SongVisu(props) {
     }
   };
 
-  // TODO: check if the move is in the X direction
   const handleOnMouseMove = (event, canvasRef) => {
     if (moving) {
-      // console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
       const mouseXPx = event.nativeEvent.offsetX;
       const moveVectPx = mouseXPx - mouseMoveXOriginPx;
-      // setTranslationGphInc(moveVectPx / zoom0);
+      // Nothing has really change, just exit
+      if (translationGphInc === moveVectPx / zoom0) {
+        return;
+      }
       translationGphInc = moveVectPx / zoom0;
 
       const canvas = canvasRef.current;
