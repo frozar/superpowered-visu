@@ -168,6 +168,10 @@ function transformOf0(xFixedPx, zoom, translationPx) {
   return (0 - xFixedPx) * zoom + xFixedPx + translationPx * zoom;
 }
 
+function translationMaxGphOf0(xFixedPx, zoom) {
+  return (-1 / zoom) * ((0 - xFixedPx) * zoom + xFixedPx);
+}
+
 function applyZoom(
   ctx,
   x0FixedPx,
@@ -230,7 +234,6 @@ function applyZoom(
       dbg("PASS 1.1");
 
       // zoomGlobal == 1 ; x0 == x1
-
       dbg("transformOf0", transformOf0(0, 1, translation));
 
       // Avoid the see on the left part of the track
@@ -323,36 +326,33 @@ function applyZoom(
   }
 }
 
-const draw = (
-  ctx,
-  channel,
-  x0FixedPx,
-  setX0FixedPx,
-  zoom0,
-  setZoom0,
-  x1FixedPx,
-  zoom1,
-  setZoom1,
-  translation,
-  setTranslation
-) => {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  drawBackground(ctx);
+let mouseMoveXOriginPx = 0;
+let translationGphInc = 0;
 
-  // Apply zoom
-  applyZoom(
-    ctx,
-    x0FixedPx,
-    setX0FixedPx,
-    zoom0,
-    setZoom0,
-    x1FixedPx,
-    zoom1,
-    setZoom1,
-    translation,
-    setTranslation
-  );
+function applyPan(ctx, x0FixedPx, zoom0, translationGph) {
+  const translationMaxGph = translationMaxGphOf0(x0FixedPx, zoom0);
 
+  if (translationGph < translationMaxGph) {
+    ctx.translate(x0FixedPx, 0);
+    ctx.scale(zoom0, 1);
+    ctx.translate(-x0FixedPx, 0);
+    ctx.translate(translationGph, 0);
+  } else {
+    ctx.translate(x0FixedPx, 0);
+    ctx.scale(zoom0, 1);
+    ctx.translate(-x0FixedPx, 0);
+    ctx.translate(translationMaxGph, 0);
+
+    // Update mouseMoveXOriginPx
+    const newMouseMoveXOriginPx =
+      mouseMoveXOriginPx - (translationMaxGph - translationGph) * zoom0;
+    if (newMouseMoveXOriginPx !== mouseMoveXOriginPx) {
+      mouseMoveXOriginPx = newMouseMoveXOriginPx;
+    }
+  }
+}
+
+const draw = (ctx, channel) => {
   // Draw line
   ctx.scale(1, ctx.canvas.height / 2);
   const pointWidth = ctx.canvas.width / channel.data.length;
@@ -398,11 +398,9 @@ function SongVisu(props) {
   const [zoom0, setZoom0] = useState(1);
   const [x1FixedPx, setX1FixedPx] = useState(0);
   const [zoom1, setZoom1] = useState(1);
-  const [translation, setTranslation] = useState(0);
+  const [translationGph, setTranslationGph] = useState(0);
   const [init, setInit] = useState(true);
   const [moving, setMoving] = useState(false);
-  const [mouseMoveXOriginPx, setMouseMoveXOriginPx] = useState(0);
-  const [translationInc, setTranslationInc] = useState(0);
 
   const canvasRef = useRef(null);
 
@@ -449,10 +447,12 @@ function SongVisu(props) {
       const ctx = canvas.getContext("2d");
       ctx.translate(0, canvas.height / 2);
 
-      //Our draw come here
-      draw(
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      drawBackground(ctx);
+
+      // Apply zoom
+      applyZoom(
         ctx,
-        props.channel,
         x0FixedPx,
         setX0FixedPx,
         zoom0,
@@ -460,88 +460,60 @@ function SongVisu(props) {
         x1FixedPx,
         zoom1,
         setZoom1,
-        translation,
-        setTranslation
+        translationGph,
+        setTranslationGph
       );
+
+      //Our draw come here
+      draw(ctx, props.channel);
       dbg("");
     }
     setInit(false);
-  }, [props.channel, zoom1, translation]);
+  }, [props.channel, zoom1, translationGph]);
 
   const handleOnMouseDown = (event, canvasRef) => {
     const canvas = canvasRef.current;
     if (event.ctrlKey) {
       canvas.style.cursor = "move";
-      // console.log("event", event);
       setMoving(true);
-      setMouseMoveXOriginPx(event.nativeEvent.offsetX);
+      mouseMoveXOriginPx = event.nativeEvent.offsetX;
     }
   };
 
   // TODO: check if the move is in the X direction
   const handleOnMouseMove = (event, canvasRef) => {
     if (moving) {
-      console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
+      // console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
       const mouseXPx = event.nativeEvent.offsetX;
       const moveVectPx = mouseXPx - mouseMoveXOriginPx;
-      setTranslationInc(moveVectPx / zoom0);
-      // console.log("mouseXPx", mouseXPx);
-      // console.log("mouseMoveXOriginPx", mouseMoveXOriginPx);
-      // console.log("moveVectPx", moveVectPx);
+      // setTranslationGphInc(moveVectPx / zoom0);
+      translationGphInc = moveVectPx / zoom0;
+
       const canvas = canvasRef.current;
 
       setDimension(canvas);
       const ctx = canvas.getContext("2d");
       ctx.translate(0, canvas.height / 2);
 
-      // ctx.translate(x0FixedPx, 0);
-      // ctx.scale(zoom0, 1);
-      // ctx.translate(-x0FixedPx, 0);
-      // ctx.translate(translation + translationInc, 0);
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      drawBackground(ctx);
 
-      // console.log("translation", translation);
-      // console.log("translationInc", translationInc);
-      // console.log("translation + translationInc", translation + translationInc);
-      draw(
-        ctx,
-        props.channel,
-        x0FixedPx,
-        setX0FixedPx,
-        zoom0,
-        setZoom0,
-        x1FixedPx,
-        zoom1,
-        setZoom1,
-        // translation + moveVectPx / zoom0,
-        translation + translationInc,
-        (arg) => {}
-        // setTranslationInc
-      );
-      // setMouseMoveXOriginPx(mouseMoveXOriginPx + translationInc);
+      // Apply pan
+      applyPan(ctx, x0FixedPx, zoom0, translationGph + translationGphInc);
+
+      draw(ctx, props.channel);
     }
   };
 
   const handleOnMouseUp = (event, canvasRef) => {
     const canvas = canvasRef.current;
     if (moving) {
-      // TODO: extract the logic from draw function to know which
-      // transform is relevant to apply and when to update the translation
-      // vector.
-      if (0 < transformOf0(0, 1, translation + translationInc)) {
-        console.log("DON'T UPDATE TRANSLATION VECTOR");
-        console.log("translation", translation);
-        // setTranslation(translation + translationInc);
-      } else {
-        console.log("UPDATE TRANSLATION VECTOR");
-        console.log("translation", translation + translationInc);
-        setTranslation(translation + translationInc);
-      }
+      setTranslationGph(translationGph + translationGphInc);
     }
-    setTranslationInc(0);
+    translationGphInc = 0;
+    mouseMoveXOriginPx = 0;
     canvas.style.cursor = "default";
     setMoving(false);
-    setMouseMoveXOriginPx(0);
-    console.log("");
   };
 
   return (
@@ -718,12 +690,12 @@ class Stretcher extends React.Component {
           </div>
           <div
             style={{
-              width: `calc(${divWidthPx}px - 1em)`,
+              width: `calc(${divWidthPx}px)`,
               height: `calc(${divHeightPx}px + 2em)`,
               paddingTop: "1em",
               paddingBottom: "1em",
-              paddingLeft: "0.5em",
-              paddingRight: "0.5em",
+              paddingLeft: "0em",
+              paddingRight: "0em",
             }}
           >
             <SongVisu channel={this.state.visuDataLeft} />
