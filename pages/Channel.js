@@ -329,7 +329,7 @@ export default function Channel(props) {
 
   const draw = (ctx, channel, xFixedPx, zoom, translationGph) => {
     const nbPt = channel.data.length;
-    const pointWidth = ctx.canvas.width / nbPt;
+    const pointWidth = window.screen.width / nbPt;
 
     // Compute the window of point to display on screen
     let firstVisibleIdx = null;
@@ -368,7 +368,7 @@ export default function Channel(props) {
       }
 
       // Apply gradient
-      const grd = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
+      const grd = ctx.createLinearGradient(0, 0, window.screen.width, 0);
       grd.addColorStop(0, "red");
       grd.addColorStop(1, "blue");
       ctx.strokeStyle = grd;
