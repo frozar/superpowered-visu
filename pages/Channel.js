@@ -26,6 +26,7 @@ export default function Channel(props) {
   const {
     channel,
     name,
+    width,
     x0FixedPx,
     setX0FixedPx,
     zoom0,
@@ -36,30 +37,25 @@ export default function Channel(props) {
     setZoom1,
     translationGph,
     setTranslationGph,
-    moving,
-    setMoving,
-    // rerender,
-    // setRerender,
+    panning,
+    setPanning,
+    panningTranslation,
+    setPanningTranslation,
     ...propsRest
   } = props;
-
-  // console.log("propsRest", propsRest);
 
   // *** BEGIN HELPER FUNCTION
   function setDimension(canvas) {
     const parentNode = canvas.parentNode;
-    const width = parentNode.clientWidth;
     const height = parentNode.clientHeight;
     const style = getComputedStyle(parentNode);
 
     // Docutation link:
     // https://www.javascripttutorial.net/javascript-dom/javascript-width-height/
-    const contentWidth =
-      width - parseInt(style.paddingLeft) - parseInt(style.paddingRight);
     const contentHeight =
       height - parseInt(style.paddingTop) - parseInt(style.paddingBottom);
 
-    canvas.width = contentWidth;
+    canvas.width = width;
     canvas.height = contentHeight;
   }
 
@@ -386,7 +382,7 @@ export default function Channel(props) {
     let effectiveXFixedPx;
     let effectiveZoom;
 
-    const adjustNormalisation = 200;
+    const adjustNormalisation = 200; // arbitrary value
     effectiveXFixedPx = event.offsetX;
 
     if (event.deltaY < 0) {
@@ -447,30 +443,20 @@ export default function Channel(props) {
       draw(ctx, channel, xFixed, zoom, scaledTranslation);
       dbg("");
       setInit(false);
-      // setRerender(false);
     }
   }, [channel, zoom0, zoom1, translationGph]);
-
-  // useEffect(() => {
-  //   const ctx = setupCanvas(canvasRef);
-
-  //   // Our draw come here
-  //   draw(ctx, channel, x0FixedPx, zoom0, translationGph);
-  //   // dbg("");
-  // }, [translationGph]);
 
   const handleOnMouseDown = (event, canvasRef) => {
     const canvas = canvasRef.current;
     if (event.ctrlKey) {
       canvas.style.cursor = "move";
-      setMoving(true);
+      setPanning(true);
       G_mouseMoveXOriginPx = event.nativeEvent.offsetX;
     }
   };
 
   const handleOnMouseMove = (event, canvasRef) => {
-    if (moving) {
-      console.log("name", name);
+    if (panning) {
       const mouseXPx = event.nativeEvent.offsetX;
       const moveVectPx = mouseXPx - G_mouseMoveXOriginPx;
       // Avoid to redraw if the translation along X axis doesn't update
@@ -496,27 +482,41 @@ export default function Channel(props) {
           G_firstZeroEffectiveTranslation = true;
         }
 
-        const ctx = setupCanvas(canvasRef);
-
-        // Apply pan
-        applyPan(ctx, x0FixedPx, zoom0, effectiveTranslation);
-
-        draw(ctx, channel, x0FixedPx, zoom0, effectiveTranslation);
-
-        // setRerender(true);
+        setPanningTranslation(effectiveTranslation);
       }
     }
   };
 
+  // Handle the panning while the mouse is moving
+  useEffect(() => {
+    const ctx = setupCanvas(canvasRef);
+
+    // Apply pan
+    applyPan(ctx, x0FixedPx, zoom0, panningTranslation);
+
+    draw(ctx, channel, x0FixedPx, zoom0, panningTranslation);
+  }, [panningTranslation]);
+
+  // Take care of window resize
+  useEffect(() => {
+    const ctx = setupCanvas(canvasRef);
+
+    // Apply zoom
+    applyZoom(ctx, x0FixedPx, zoom0, translationGph);
+
+    // Our draw come here
+    draw(ctx, channel, x0FixedPx, zoom0, translationGph);
+  }, [width]);
+
   const handleOnMouseUp = (event, canvasRef) => {
     const canvas = canvasRef.current;
-    if (moving) {
+    if (panning) {
       setTranslationGph(translationGph + G_translationGphInc);
     }
     G_translationGphInc = 0;
     G_mouseMoveXOriginPx = 0;
     canvas.style.cursor = "default";
-    setMoving(false);
+    setPanning(false);
   };
 
   return (

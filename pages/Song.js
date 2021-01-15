@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import Channel from "./Channel";
 
 export default function Song(props) {
@@ -7,13 +7,14 @@ export default function Song(props) {
   const [x1FixedPx, setX1FixedPx] = useState(0);
   const [zoom1, setZoom1] = useState(1);
   const [translationGph, setTranslationGph] = useState(0);
-  const [moving, setMoving] = useState(false);
-  // const [rerender, setRerender] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const [panningTranslation, setPanningTranslation] = useState(0);
 
   return (
     <>
       <Channel
         channel={props.channelLeft}
+        width={props.width}
         name="leftTrack"
         x0FixedPx={x0FixedPx}
         setX0FixedPx={setX0FixedPx}
@@ -25,13 +26,14 @@ export default function Song(props) {
         setZoom1={setZoom1}
         translationGph={translationGph}
         setTranslationGph={setTranslationGph}
-        moving={moving}
-        setMoving={setMoving}
-        // rerender={rerender}
-        // setRerender={setRerender}
+        panning={panning}
+        setPanning={setPanning}
+        panningTranslation={panningTranslation}
+        setPanningTranslation={setPanningTranslation}
       />
       <Channel
         channel={props.channelRight}
+        width={props.width}
         name="rightTrack"
         x0FixedPx={x0FixedPx}
         setX0FixedPx={setX0FixedPx}
@@ -43,10 +45,10 @@ export default function Song(props) {
         setZoom1={setZoom1}
         translationGph={translationGph}
         setTranslationGph={setTranslationGph}
-        moving={moving}
-        setMoving={setMoving}
-        // rerender={rerender}
-        // setRerender={setRerender}
+        panning={panning}
+        setPanning={setPanning}
+        panningTranslation={panningTranslation}
+        setPanningTranslation={setPanningTranslation}
       />
     </>
   );

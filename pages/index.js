@@ -114,6 +114,7 @@ class Stretcher extends React.Component {
     fileName: "",
     visuDataLeft: [],
     visuDataRight: [],
+    windowWidth: 600, // arbitrary value
   };
 
   initAudioNode = async () => {
@@ -218,6 +219,10 @@ class Stretcher extends React.Component {
     this.processInputSound(response);
   };
 
+  handleResize = (event) => {
+    this.setState({ windowWidth: window.innerWidth });
+  };
+
   componentDidMount() {
     SuperpoweredModule({
       licenseKey: "ExampleLicenseKey-WillExpire-OnNextUpdate",
@@ -233,10 +238,14 @@ class Stretcher extends React.Component {
         awaitFunc();
       },
     });
+
+    this.setState({ windowWidth: window.innerWidth });
+    window.addEventListener("resize", this.handleResize);
   }
 
   componentWillUnmount() {
     this.cleanAudioContext();
+    window.removeEventListener("resize", this.handleResize);
   }
 
   render() {
@@ -262,7 +271,7 @@ class Stretcher extends React.Component {
           </div>
           <div
             style={{
-              width: `calc(${divWidthPx}px)`,
+              width: `calc(${this.state.windowWidth}px)`,
               height: `calc(${divHeightPx}px + 2em)`,
               paddingTop: "1em",
               paddingBottom: "1em",
@@ -271,6 +280,7 @@ class Stretcher extends React.Component {
             }}
           >
             <Song
+              width={this.state.windowWidth}
               channelLeft={this.state.visuDataLeft}
               channelRight={this.state.visuDataRight}
             />
