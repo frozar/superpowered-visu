@@ -167,8 +167,19 @@ function dbg() {
   }
 }
 
-function transformOf0(xFixedPx, zoom, translationPx) {
-  return (0 - xFixedPx) * zoom + xFixedPx + translationPx * zoom;
+function Px2Graph(xPixel, xFixedPx, zoom, translationGraph) {
+  return (xPixel - xFixedPx) * zoom + xFixedPx + translationGraph * zoom;
+}
+
+// xGraph = (xPixel - xFixedPx) * zoom + xFixedPx + translationPx * zoom
+// (xGraph  - xFixedPx - translationPx * zoom ) * (1/zoom) + - xFixedPx = xPixel
+
+function Graph2Px(xGraph, xFixedPx, zoom, translationGraph) {
+  return (xGraph - xFixedPx - translationGraph * zoom) * (1 / zoom) + -xFixedPx;
+}
+
+function transformOf0(xFixedPx, zoom, translationGraph) {
+  return Px2Graph(0, xFixedPx, zoom, translationGraph);
 }
 
 function translationMaxGphOf0(xFixedPx, zoom) {
@@ -352,17 +363,26 @@ function applyPan(ctx, x0FixedPx, zoom0, translationGph) {
   }
 }
 
-const draw = (ctx, channel) => {
+const draw = (ctx, channel, xFixedPx, zoom, translationGph) => {
   // Draw line
   ctx.scale(1, ctx.canvas.height / 2);
   const pointWidth = ctx.canvas.width / channel.data.length;
   ctx.beginPath();
   ctx.moveTo(0, 0);
+  const xPxFirst = Graph2Px(0, xFixedPx, zoom, translationGph);
+  console.log("xPxFirst", xPxFirst);
+  const lastIdx = channel.data.length - 1;
+  const xPxLast = Graph2Px(
+    lastIdx * pointWidth,
+    xFixedPx,
+    zoom,
+    translationGph
+  );
+  console.log("xPxLast", xPxLast);
   for (let i = 0; i < channel.data.length; ++i) {
-    ctx.lineTo(
-      (i * pointWidth + (i * pointWidth + pointWidth * 0.95)) / 2,
-      -channel.data[i]
-    );
+    const xStart = i * pointWidth;
+    const xEnd = (i + 1) * pointWidth;
+    ctx.lineTo((xStart + xEnd) / 2, -channel.data[i]);
   }
 
   // Apply gradient
@@ -465,7 +485,7 @@ function SongVisu(props) {
       );
 
       //Our draw come here
-      draw(ctx, props.channel);
+      draw(ctx, props.channel, x0FixedPx, zoom0, translationGph);
       dbg("");
     }
     setInit(false);
@@ -502,7 +522,13 @@ function SongVisu(props) {
       // Apply pan
       applyPan(ctx, x0FixedPx, zoom0, translationGph + translationGphInc);
 
-      draw(ctx, props.channel);
+      draw(
+        ctx,
+        props.channel,
+        x0FixedPx,
+        zoom0,
+        translationGph + translationGphInc
+      );
     }
   };
 
